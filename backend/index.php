@@ -2,10 +2,7 @@
 use Slim\Factory\AppFactory;
 use Delight\Auth\Auth;
 use DI\Container;
-use Delight\Auth\InvalidEmailException;
-use Delight\Auth\InvalidPasswordException;
-use Delight\Auth\UserAlreadyExistsException;
-use Delight\Auth\TooManyRequestsException;
+use Kristian\Apps\Mail\Mailer;
 
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/env.php';
@@ -24,16 +21,28 @@ $container->set('Auth', function ($container) {
     return new Auth($container->get('PDO'));
 });
 
+// Adds mailer to the container to use throughout
+$container->set(Mailer::class, function(){
+    return new Mailer();
+});
+
 $app = AppFactory::create();
 
 // CORS Middleware
 $corsMiddleware = function ($request, $handler) {
     $response = $handler->handle($request);
+    $allowedOrigins = ['http://movie-website.local', 'http://localhost', 'http://localhost:3000'];
+    $origin = $request->getHeaderLine('Origin');
+
+    if (in_array($origin, $allowedOrigins)) {
+        $response = $response->withHeader('Access-Control-Allow-Origin', $origin);
+    }
+
     return $response
-        ->withHeader('Access-Control-Allow-Origin', 'https://movie-website')
         ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
 };
+$app->add($corsMiddleware);
 $app->add($corsMiddleware);
 
 $app->options('/{routes:.+}', function ($request, $response, $args) {
@@ -55,34 +64,8 @@ $jsonParsingMiddleware = function ($request, $handler) {
 // Add JSON Parsing Middleware to the application
 $app->add($jsonParsingMiddleware);
 
-// Example route requiring authentication
-$app->post('/signup', function ($request, $response, $args) use ($container) {
-    $auth = $container->get('Auth');
-    $data = $request->getParsedBody();
-    $email = $data['email'];
-    $password = $data['password'];
-    $username = $data['username'];
+// Routes
+(require __DIR__ . '/routes/auth_routes.php')($app, $container); // auth routes - sign up, login etc
 
-    try {
-        $userId = $auth->register($email, $password, $username, function ($selector, $token) {
-            echo "Send verification email to user with selector $selector and token $token.";
-        });
-
-        // Success
-        $response->getBody()->write(json_encode(['message' => "Successfully registered with ID $userId"]));
-    } catch (InvalidEmailException $e) {
-        $response->getBody()->write("Invalid email address $email");
-    } catch (InvalidPasswordException $e) {
-        $response->getBody()->write('Invalid password');
-    } catch (UserAlreadyExistsException $e) {
-        $response->getBody()->write('User already exists');
-    } catch (TooManyRequestsException $e) {
-        $response->getBody()->write('Too many requests');
-    } catch (\Exception $e) {
-        $response->getBody()->write('Error: ' . $e->getMessage());
-    }
-
-    return $response->withHeader('Content-Type', 'application/json');
-});
 
 $app->run();

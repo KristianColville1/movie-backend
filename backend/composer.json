@@ -5,7 +5,8 @@
     "autoload": {
         "psr-4": {
             "Kristian\\Core\\": "./core",
-            "Kristian\\Apps\\": "./apps"
+            "Kristian\\Apps\\": "./apps",
+            "Kristian\\Routes\\": "./routes"
         }
     },
     "authors": [
@@ -19,6 +20,7 @@
         "nyholm/psr7": "^1.8",
         "nyholm/psr7-server": "^1.1",
         "php-di/php-di": "^7.0",
-        "delight-im/auth": "^8.3"
+        "delight-im/auth": "^8.3",
+        "phpmailer/phpmailer": "^6.9"
     }
 }
