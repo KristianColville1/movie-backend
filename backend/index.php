@@ -6,6 +6,7 @@ use Delight\Auth\InvalidEmailException;
 use Delight\Auth\InvalidPasswordException;
 use Delight\Auth\UserAlreadyExistsException;
 use Delight\Auth\TooManyRequestsException;
+
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/env.php';
 
@@ -25,23 +26,52 @@ $container->set('Auth', function ($container) {
 
 $app = AppFactory::create();
 
+// CORS Middleware
+$corsMiddleware = function ($request, $handler) {
+    $response = $handler->handle($request);
+    return $response
+        ->withHeader('Access-Control-Allow-Origin', 'https://movie-website')
+        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+};
+$app->add($corsMiddleware);
+
+$app->options('/{routes:.+}', function ($request, $response, $args) {
+    return $response;
+});
+
+// JSON Parsing Middleware
+$jsonParsingMiddleware = function ($request, $handler) {
+    $contentType = $request->getHeaderLine('Content-Type');
+    if (strstr($contentType, 'application/json')) {
+        $contents = json_decode(file_get_contents('php://input'), true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            $request = $request->withParsedBody($contents);
+        }
+    }
+    return $handler->handle($request);
+};
+
+// Add JSON Parsing Middleware to the application
+$app->add($jsonParsingMiddleware);
+
 // Example route requiring authentication
-$app->get('/signup', function ($request, $response, $args) use ($container) {
-    echo "here";
+$app->post('/signup', function ($request, $response, $args) use ($container) {
     $auth = $container->get('Auth');
     $data = $request->getParsedBody();
     $email = $data['email'];
     $password = $data['password'];
+    $username = $data['username'];
 
     try {
-        $userId = $auth->register($email, $password, null, function ($selector, $token) {
+        $userId = $auth->register($email, $password, $username, function ($selector, $token) {
             echo "Send verification email to user with selector $selector and token $token.";
         });
 
         // Success
-        $response->getBody()->write("Successfully registered with ID $userId");
+        $response->getBody()->write(json_encode(['message' => "Successfully registered with ID $userId"]));
     } catch (InvalidEmailException $e) {
-        $response->getBody()->write('Invalid email address');
+        $response->getBody()->write("Invalid email address $email");
     } catch (InvalidPasswordException $e) {
         $response->getBody()->write('Invalid password');
     } catch (UserAlreadyExistsException $e) {
@@ -52,7 +82,7 @@ $app->get('/signup', function ($request, $response, $args) use ($container) {
         $response->getBody()->write('Error: ' . $e->getMessage());
     }
 
-    return $response;
+    return $response->withHeader('Content-Type', 'application/json');
 });
 
 $app->run();
