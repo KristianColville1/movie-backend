@@ -1,0 +1,24 @@
+{
+    "name": "kristian/backend",
+    "description": "backend",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Kristian\\Core\\": "./core",
+            "Kristian\\Apps\\": "./apps"
+        }
+    },
+    "authors": [
+        {
+            "name": "KristianColville1",
+            "email": "kristiancolville1@gmail.com"
+        }
+    ],
+    "require": {
+        "slim/slim": "4.*",
+        "nyholm/psr7": "^1.8",
+        "nyholm/psr7-server": "^1.1",
+        "php-di/php-di": "^7.0",
+        "delight-im/auth": "^8.3"
+    }
+}
