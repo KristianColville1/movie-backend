@@ -83,4 +83,34 @@ return function (App $app, Container $container) {
         return $response->withHeader('Content-Type', 'application/json')
             ->withStatus(200);
     });
+
+    // verifies user
+    $app->get('/verify_email', function ($request, $response, $args) use ($container) {
+        $auth = $container->get('Auth');
+        $queryParams = $request->getQueryParams();
+        $selector = $queryParams['selector'] ?? '';
+        $token = $queryParams['token'] ?? '';
+
+        try {
+            // Verify the email using the selector and token
+            $auth->confirmEmail($selector, $token);
+
+            // Success
+            $message = ['message' => "Email successfully verified."];
+        } catch (\Delight\Auth\InvalidSelectorTokenPairException $e) {
+            $message = ['error' => 'Invalid token'];
+        } catch (\Delight\Auth\TokenExpiredException $e) {
+            $message = ['error' => 'Token expired'];
+        } catch (UserAlreadyExistsException $e) {
+            $message = ['error' => 'Email already verified'];
+        } catch (TooManyRequestsException $e) {
+            $message = ['error' => 'Too many requests'];
+        } catch (\Exception $e) {
+            $message = ['error' => 'An error occurred: ' . $e->getMessage()];
+        }
+
+        return $response->withHeader('Content-Type', 'application/json')
+            ->write(json_encode($message))
+            ->withStatus(200);
+    });
 };
