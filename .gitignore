@@ -1,3 +1,4 @@
 env.php
 error_log.log
 vendor
+default_users.php
