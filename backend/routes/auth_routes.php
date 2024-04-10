@@ -59,29 +59,82 @@ return function (App $app, Container $container) {
     $app->post('/signin', function ($request, $response, $args) use ($container) {
         $auth = $container->get('Auth');
         $data = $request->getParsedBody();
-        $email = $data['email'];
-        $password = $data['password'];
+
+        $username_or_email = $data['username_or_email'] ?? '';
+        $password = $data['password'] ?? '';
+
+        $rememberDuration = 60 * 60 * 24 * 365.25; // 1 year in seconds
 
         try {
-            $auth->login($email, $password);
-            // Success
-            $response->getBody()->write(json_encode(['message' => "Successfully signed in"]));
+            // login method automatically handles both email and username.
+            $auth->login($username_or_email, $password, $rememberDuration = 0);
+
+            // If login is successful, gather the user data
+            $userData = [
+                'userId' => $auth->getUserId(),
+                'email' => $auth->getEmail(),
+                'username' => $auth->getUsername(), // Assuming you have a method to get the username
+                // Add any other user-related information here
+            ];
+
+            // Write the success message and user data to the response body
+            $responseBody = json_encode([
+                'message' => "Successfully signed in",
+                'user' => $userData
+            ]);
+
+            // Send the JSON response with a 200 OK status
+            $response->getBody()->write($responseBody);
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
         } catch (InvalidEmailException $e) {
-            $response->getBody()->write(json_encode(['error' => 'Wrong email address']));
+            error_log("Tried as email");
+            try {
+                $auth->loginWithUsername($username_or_email, $password, $rememberDuration = 0);
+                // If login is successful, gather the user data
+                $userData = [
+                    'userId' => $auth->getUserId(),
+                    'email' => $auth->getEmail(),
+                    'username' => $auth->getUsername(), // Assuming you have a method to get the username
+                    // Add any other user-related information here
+                ];
+
+                // Write the success message and user data to the response body
+                $responseBody = json_encode([
+                    'message' => "Successfully signed in",
+                    'user' => $userData
+                ]);
+
+                // Send the JSON response with a 200 OK status
+                $response->getBody()->write($responseBody);
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            } catch (\Delight\Auth\UnknownUsernameException $e) {
+                $response->getBody()->write(json_encode(['error' => 'Username not found']));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+            } catch (InvalidPasswordException $e) {
+                // This catches password errors on the second attempt
+                $response->getBody()->write(json_encode(['error' => 'Wrong password']));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
+            }
+            // Handle other exceptions as needed.
         } catch (InvalidPasswordException $e) {
             $response->getBody()->write(json_encode(['error' => 'Wrong password']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         } catch (EmailNotVerifiedException $e) {
             $response->getBody()->write(json_encode(['error' => 'Email not verified']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         } catch (AttemptCancelledException $e) {
             $response->getBody()->write(json_encode(['error' => 'Attempt cancelled']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         } catch (TooManyRequestsException $e) {
             $response->getBody()->write(json_encode(['error' => 'Too many requests']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         } catch (\Exception $e) {
             $response->getBody()->write(json_encode(['error' => 'An error occurred: ' . $e->getMessage()]));
+            
         }
 
-        return $response->withHeader('Content-Type', 'application/json')
-            ->withStatus(200);
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+
     });
 
     // verifies user
@@ -96,7 +149,7 @@ return function (App $app, Container $container) {
             $auth->confirmEmail($selector, $token);
 
             // Success
-            $message = ['message' => "Email successfully verified."];
+            return $response->withRedirect('/', 200);
         } catch (\Delight\Auth\InvalidSelectorTokenPairException $e) {
             $message = ['error' => 'Invalid token'];
         } catch (\Delight\Auth\TokenExpiredException $e) {
@@ -110,7 +163,6 @@ return function (App $app, Container $container) {
         }
 
         return $response->withHeader('Content-Type', 'application/json')
-            ->write(json_encode($message))
-            ->withStatus(200);
+            ->withStatus(404);
     });
 };

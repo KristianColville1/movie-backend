@@ -67,5 +67,6 @@ $app->add($jsonParsingMiddleware);
 // Routes
 (require __DIR__ . '/routes/auth_routes.php')($app, $container); // auth routes - sign up, login etc
 
-
+// Set up Admin Users
+(require __DIR__ . '/core/default_users.php')($app, $container);
 $app->run();

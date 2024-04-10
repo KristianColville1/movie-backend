@@ -58,6 +58,7 @@ class Mailer
             $this->mail->AltBody = $altBody;
 
             $this->mail->send();
+            error_log("VERIFICATION EMAIL SENT!");
             return true;
         } catch (Exception $e) {
             return false;
